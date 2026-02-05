@@ -1,5 +1,5 @@
 import express from 'express';
-
+import { matchRouter } from './routes/match.route.js';
 const app = express();
 const PORT = process.env.PORT;
 
@@ -10,6 +10,8 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running' });
 });
+
+app.use('/matches', matchRouter);
 
 // Start server
 app.listen(PORT, () => {
