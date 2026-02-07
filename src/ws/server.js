@@ -20,6 +20,8 @@ export function attachWebSocketServer(server) {
         const { pathname } = new URL(req.url, `http://${req.headers.host}`);
 
         if (pathname !== '/ws') {
+            socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+            socket.destroy();
             return;
         }
 
@@ -65,16 +67,12 @@ export function attachWebSocketServer(server) {
             socket.terminate();
         });
 
-        socket.on('close', () => {
-            cleanupSubscriptions(socket);
-        })
-
         socket.on('error', console.error);
     });
 
     const interval = setInterval(() => {
         wss.clients.forEach((ws) => {
-            if (ws.isAlive === false) return ws.terminate();
+            if (ws.isAlive === false) ws.terminate();
 
             ws.isAlive = false;
             ws.ping();
@@ -83,13 +81,5 @@ export function attachWebSocketServer(server) {
 
     wss.on('close', () => clearInterval(interval));
 
-    function broadcastMatchCreated(match) {
-        broadcastToAll(wss, { type: 'match_created', data: match });
-    }
 
-    function broadcastCommentary(matchId, comment) {
-        broadcastToMatch(matchId, { type: 'commentary', data: comment });
-    }
-
-    return { broadcastMatchCreated, broadcastCommentary };
 }
