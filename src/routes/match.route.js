@@ -4,10 +4,10 @@ import { matches } from '../db/schema.js'
 import { createMatchSchema, listMatchesQuerySchema } from '../validation/matches.js'
 import { getMatchStatus } from '../utils/match-status.js'
 import { desc } from 'drizzle-orm'
+import { MAX_LIMIT } from '../const.js'
 
 export const matchRouter = Router()
 
-const MAX_LIMIT = 100;
 matchRouter.get('/', async (req, res) => {
     const parsed = listMatchesQuerySchema.safeParse(req.query)
 
@@ -59,9 +59,9 @@ matchRouter.post('/', async (req, res) => {
             awayScore: awayScore ?? 0,
         }).returning();
 
-        if (req.app.locals.broadcastMatchCreated) {
+        if (res.app.locals.broadcastMatchCreated) {
             try {
-                req.app.locals.broadcastMatchCreated(event);
+                res.app.locals.broadcastMatchCreated(event);
             } catch (broadcastError) {
                 console.error('Error broadcasting match:', broadcastError)
             }
