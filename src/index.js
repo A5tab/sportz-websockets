@@ -4,7 +4,9 @@ import { commentaryRouter } from './routes/commentary.route.js';
 import http from 'http';
 import { attachWebSocketServer } from './ws/server.js';
 import { securityMiddleware } from './arcjet.js';
+import AgentAPI from 'apminsight';
 
+AgentAPI.config()
 const app = express();
 const PORT = Number(process.env.PORT || 8000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -20,6 +22,7 @@ app.get('/', (req, res) => {
 });
 
 app.use(securityMiddleware())
+
 app.use('/matches', matchRouter);
 app.use('/matches/:id/commentary', commentaryRouter);
 
