@@ -59,6 +59,7 @@ function handleMessage(socket, data) {
         message = JSON.parse(data.toString());
     } catch (error) {
         sendJSON(socket, { type: 'error', data: 'Invalid JSON' });
+        return;
     }
 
     if (message?.type === 'subscribe' && Number.isInteger(message.matchId)) {

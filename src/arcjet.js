@@ -2,7 +2,8 @@ import arcjet, { detectBot, shield, slidingWindow } from "@arcjet/node"
 
 
 const arcjetKey = process.env.ARCJET_KEY
-const arcjetMode = process.env.ARCJET_ENV === "development" ? "DRY_RUN" : "LIVE"
+const arcjetEnv = process.env.ARCJET_ENV ?? "development"
+const arcjetMode = arcjetEnv === "development" ? "DRY_RUN" : "LIVE"
 
 if (!arcjetKey) throw new Error("ARCJET_KEY environment variable is required")
 
