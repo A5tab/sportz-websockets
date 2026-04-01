@@ -1,19 +1,18 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
-
+import { StyleSheet, } from 'react-native'
+import { ThemedView, ThemedText } from '../components'
 const index = () => {
   return (
-    <View>
-      <Text>Welcome to Sportz App!!!</Text>
-    </View>
+    <ThemedView style={styles.container}>
+      <ThemedText variant={'title'}>Welcome to Sportz App!!!</ThemedText>
+    </ThemedView>
   )
 }
 
 export default index
 
 const styles = StyleSheet.create({
-  continer:{
-    flex:1,
+  container: {
+    flex: 1,
     alignItems: "center",
-  }
+  },
 })
