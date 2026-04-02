@@ -1,13 +1,8 @@
 import React from 'react'
-import { StyleSheet, useColorScheme, View } from 'react-native'
-import { useRouter } from 'expo-router'
-import { ThemedView, ThemedText, ThemedButton, Spacer } from '../components'
-import { getTheme } from '../constants/Colors'
+import { StyleSheet } from 'react-native'
+import { ThemedView, ThemedText } from '../components'
 
 const Index = () => {
-  const router = useRouter()
-  const theme = getTheme(useColorScheme() ?? 'light')
-
   return (
     // <ThemedView safe={true} style={styles.container}>
     //   <View style={styles.heroWrap}>
@@ -38,8 +33,8 @@ const Index = () => {
     //     </ThemedButton>
     //   </View>
     // </ThemedView>
-    <ThemedView safe={true}>
-      <ThemedText style={styles.container} variant='title'>Sportz</ThemedText>
+    <ThemedView safe={true} style={styles.container}>
+      <ThemedText style={styles.title} variant='title'>Sportz</ThemedText>
     </ThemedView>
   )
 }
@@ -50,8 +45,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
-    backgroundColor: "red"
-  }
+    backgroundColor: 'red',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontWeight: '800',
+  },
 })
 
 // const styles = StyleSheet.create({
