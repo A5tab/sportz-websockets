@@ -21,6 +21,7 @@ const ThemedTextInput = ({
             {label && <ThemedText style={styles.label}>{label}</ThemedText>}
 
             <TextInput
+                placeholderTextColor={theme.textMuted}
                 {...props}
                 style={[{
                     backgroundColor: disabled ? theme.textMuted : theme.surface,
