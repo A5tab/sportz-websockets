@@ -1,18 +1,86 @@
-import { StyleSheet, } from 'react-native'
-import { ThemedView, ThemedText } from '../components'
-const index = () => {
+import React from 'react'
+import { StyleSheet, useColorScheme, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { ThemedView, ThemedText, ThemedButton, Spacer } from '../components'
+import { getTheme } from '../constants/Colors'
+
+const Index = () => {
+  const router = useRouter()
+  const theme = getTheme(useColorScheme() ?? 'light')
+
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText variant={'title'}>Welcome to Sportz App!!!</ThemedText>
+    // <ThemedView safe={true} style={styles.container}>
+    //   <View style={styles.heroWrap}>
+    //     <ThemedText variant="title" style={styles.title}>Sportz</ThemedText>
+    //     <Spacer size={8} />
+    //     <ThemedText muted={true} style={styles.subtitle}>
+    //       Live scores, quick commentary, and instant match updates.
+    //     </ThemedText>
+    //   </View>
+
+    //   <View style={styles.ctaWrap}>
+    //     <ThemedButton
+    //       variant="primary"
+    //       onPress={() => router.push('/(auth)/login')}
+    //       style={styles.button}
+    //     >
+    //       <ThemedText style={[styles.buttonText, { color: theme.textInverse }]}>Login</ThemedText>
+    //     </ThemedButton>
+
+    //     <Spacer size={12} />
+
+    //     <ThemedButton
+    //       variant="outline"
+    //       onPress={() => router.push('/(auth)/signup')}
+    //       style={styles.button}
+    //     >
+    //       <ThemedText style={{ color: theme.primary }}>Signup</ThemedText>
+    //     </ThemedButton>
+    //   </View>
+    // </ThemedView>
+    <ThemedView safe={true}>
+      <ThemedText style={styles.container} variant='title'>Sportz</ThemedText>
     </ThemedView>
   )
 }
 
-export default index
+export default Index
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-  },
+    paddingHorizontal: 20,
+    backgroundColor: "red"
+  }
 })
+
+// const styles = StyleSheet.create({
+//   container: {
+//     flex: 1,
+//     paddingHorizontal: 20,
+//     justifyContent: 'space-between',
+//     paddingVertical: 28,
+//   },
+//   heroWrap: {
+//     marginTop: 44,
+//   },
+//   title: {
+//     fontSize: 48,
+//     lineHeight: 54,
+//     fontWeight: '800',
+//     letterSpacing: 0.5,
+//   },
+//   subtitle: {
+//     maxWidth: 320,
+//   },
+//   ctaWrap: {
+//     width: '100%',
+//   },
+//   button: {
+//     width: '100%',
+//     paddingVertical: 14,
+//   },
+//   buttonText: {
+//     fontWeight: '700',
+//   },
+// })

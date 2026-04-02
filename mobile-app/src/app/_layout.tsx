@@ -1,14 +1,17 @@
-import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
+import { Stack } from 'expo-router'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 
-const _layout = () => {
+const RootLayout = () => {
   return (
-    <View>
-      <Text>_layout</Text>
-    </View>
+    <SafeAreaProvider>
+      <Stack screenOptions={
+        { headerShown: false }
+      }>
+        {/* < Stack.Screen name="index" /> */}
+      </Stack>
+    </SafeAreaProvider >
   )
 }
 
-export default _layout
-
-const styles = StyleSheet.create({})
+export default RootLayout
