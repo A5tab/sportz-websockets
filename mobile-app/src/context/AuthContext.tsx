@@ -4,6 +4,7 @@ type AuthState = {
     isLoggedIn: boolean
     data: any
     loading: boolean
+    accessToken: string
 }
 
 type AuthProviderProps = {
@@ -22,7 +23,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [auth, setAuth] = useState<AuthState>({
         isLoggedIn: false,
         data: {},
-        loading: false
+        loading: false,
+        accessToken: ""
     })
 
 
