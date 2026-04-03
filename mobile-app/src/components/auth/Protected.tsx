@@ -1,12 +1,31 @@
-import { View, Text } from 'react-native'
-import React from 'react'
+import React, { ReactNode, useEffect } from 'react'
+import { useAuth } from '../../hooks/useAuth'
+import ThemedText from '../ThemedText'
+import { useRouter } from 'expo-router'
 
-const Protected = () => {
-  return (
-    <View>
-      <Text>Protected</Text>
-    </View>
-  )
+type ProtectedProps = {
+  children: ReactNode
+}
+
+const Protected = ({ children }: ProtectedProps) => {
+  const { auth } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!auth.loading && !auth.isLoggedIn) {
+      router.replace('/')
+    }
+  }, [auth.isLoggedIn, auth.loading, router])
+
+  if (auth.loading) {
+    return <ThemedText>Loading...</ThemedText>
+  }
+
+  if (!auth.isLoggedIn) {
+    return null
+  }
+
+  return <>{children}</>
 }
 
 export default Protected

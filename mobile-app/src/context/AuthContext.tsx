@@ -16,6 +16,8 @@ type AuthContextType = {
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [auth, setAuth] = useState<AuthState>({
         isLoggedIn: false,
@@ -23,9 +25,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         loading: false
     })
 
-return (
-    <AuthContext.Provider value={{ auth, setAuth }}>
-        {children}
-    </AuthContext.Provider>
-)
+
+
+    return (
+        <AuthContext.Provider value={{ auth, setAuth }}>
+            {children}
+        </AuthContext.Provider>
+    )
 }
