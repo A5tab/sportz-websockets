@@ -16,7 +16,7 @@ type AuthContextType = {
     setAuth: React.Dispatch<React.SetStateAction<AuthState>>
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined)
+export const AuthContext = createContext<AuthContextType | null>(null)
 
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
