@@ -3,57 +3,52 @@ import { Pressable, ScrollView, StyleSheet, useColorScheme, View } from 'react-n
 import { useRouter } from 'expo-router'
 import { ThemedView, ThemedText, ThemedCard, ThemedButton, Spacer } from '../../components'
 import { getTheme } from '../../constants/Colors'
+import { useMatches } from '../../hooks/useMatches'
 
 type Match = {
-  id: string
+  id: number
   league: string
   teams: string
   score: string
   status: string
-  commentary: string
+  commentary?: string
 }
-
-const MATCHES: Match[] = [
-  {
-    id: 'm1',
-    league: 'Cricket Premier League',
-    teams: 'Titans vs Warriors',
-    score: '146/4 (16.2)',
-    status: 'Live',
-    commentary: 'Back-to-back boundaries! Momentum swings to Titans.',
-  },
-  {
-    id: 'm2',
-    league: 'International T20',
-    teams: 'India vs Australia',
-    score: '89/2 (10.0)',
-    status: 'Innings Break',
-    commentary: 'Strong middle-over control. Spinners dominated this phase.',
-  },
-  {
-    id: 'm3',
-    league: 'Women Series',
-    teams: 'England W vs NZ W',
-    score: '212/7 (40.0)',
-    status: 'Live',
-    commentary: 'Wicket! Slower ball does the trick at a crucial moment.',
-  },
-]
 
 const Dashboard = () => {
   const router = useRouter()
   const theme = getTheme(useColorScheme() ?? 'light')
-  const [subscribedMatchIds, setSubscribedMatchIds] = useState<string[]>(['m1'])
+  const {
+    matches,
+    subscribedMatchIds,
+    commentaryByMatchId,
+    connectionStatus,
+    toggleMatchSubscription,
+  } = useMatches()
 
   const subscribedMatches = useMemo(
-    () => MATCHES.filter((match) => subscribedMatchIds.includes(match.id)),
-    [subscribedMatchIds]
+    () => matches.filter((match) => subscribedMatchIds.includes(match.id)),
+    [matches, subscribedMatchIds]
   )
 
-  const toggleSubscription = (id: string) => {
-    setSubscribedMatchIds((prev) =>
-      prev.includes(id) ? prev.filter((matchId) => matchId !== id) : [...prev, id]
-    )
+  const uiMatches: Match[] = useMemo(() => {
+    return matches.map((match) => ({
+      id: match.id,
+      league: match.sport,
+      teams: `${match.homeTeam} vs ${match.awayTeam}`,
+      score: `${match.homeScore} - ${match.awayScore}`,
+      status: match.status,
+    }))
+  }, [matches])
+
+  const getStatusLabel = (status: string) => {
+    if (status === 'live') return 'Live'
+    if (status === 'finished') return 'Finished'
+    return 'Scheduled'
+  }
+
+  const getLatestCommentary = (matchId: number) => {
+    const comments = commentaryByMatchId[matchId] ?? []
+    return comments[0]?.message ?? 'No commentary yet for this match.'
   }
 
   return (
@@ -70,12 +65,16 @@ const Dashboard = () => {
         <Spacer size={8} />
         <ThemedText variant='title' style={styles.title}>Match Dashboard</ThemedText>
         <ThemedText muted={true}>Subscribe to one or more matches for live commentary updates.</ThemedText>
+        <Spacer size={8} />
+        <ThemedText variant='caption' muted={true}>
+          WebSocket: {connectionStatus}
+        </ThemedText>
 
         <Spacer size={16} />
         <ThemedText variant='heading'>Available Matches</ThemedText>
         <Spacer size={10} />
 
-        {MATCHES.map((match) => {
+        {uiMatches.map((match) => {
           const isSubscribed = subscribedMatchIds.includes(match.id)
           return (
             <View key={match.id} style={styles.blockGap}>
@@ -85,14 +84,16 @@ const Dashboard = () => {
                   <View
                     style={[
                       styles.statusPill,
-                      { backgroundColor: match.status === 'Live' ? theme.successSoft : theme.warningSoft },
+                      {
+                        backgroundColor: match.status === 'live' ? theme.successSoft : theme.warningSoft,
+                      },
                     ]}
                   >
                     <ThemedText
                       variant='caption'
-                      style={{ color: match.status === 'Live' ? theme.success : theme.warning, fontWeight: '700' }}
+                      style={{ color: match.status === 'live' ? theme.success : theme.warning, fontWeight: '700' }}
                     >
-                      {match.status}
+                      {getStatusLabel(match.status)}
                     </ThemedText>
                   </View>
                 </View>
@@ -104,7 +105,7 @@ const Dashboard = () => {
                 <Spacer size={12} />
                 <ThemedButton
                   variant={isSubscribed ? 'outline' : 'primary'}
-                  onPress={() => toggleSubscription(match.id)}
+                  onPress={() => toggleMatchSubscription(match.id)}
                   style={{
                     borderColor: theme.primary,
                     backgroundColor: isSubscribed ? 'transparent' : theme.primary,
@@ -118,6 +119,12 @@ const Dashboard = () => {
             </View>
           )
         })}
+
+        {uiMatches.length === 0 && (
+          <ThemedCard style={{ borderColor: theme.border, borderWidth: 1 }}>
+            <ThemedText muted={true}>No matches available yet. New matches will appear in real-time.</ThemedText>
+          </ThemedCard>
+        )}
 
         <Spacer size={18} />
         <ThemedText variant='heading'>Live Commentary & Updates</ThemedText>
@@ -136,7 +143,7 @@ const Dashboard = () => {
                 <Spacer size={8} />
                 <ThemedText style={{ color: theme.info, fontWeight: '700' }}>{match.score}</ThemedText>
                 <Spacer size={6} />
-                <ThemedText>{match.commentary}</ThemedText>
+                <ThemedText>{getLatestCommentary(match.id)}</ThemedText>
               </ThemedCard>
             </View>
           ))
