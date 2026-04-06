@@ -117,3 +117,5 @@ export const ScoreProvider = ({ children }: ProviderProps) => {
 
     return <ScoreContext.Provider value={value}>{children}</ScoreContext.Provider>
 }
+
+
