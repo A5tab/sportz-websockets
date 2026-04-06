@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, useColorScheme, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { ThemedView, ThemedText, ThemedCard, ThemedButton, Spacer } from '../../components'
 import { getTheme } from '../../constants/Colors'
+import { useScore } from '../../hooks/useScore'
+import { useCommentary } from '../../hooks/useCommentary'
 import { useMatches } from '../../hooks/useMatches'
 
 type Match = {
@@ -17,13 +19,13 @@ type Match = {
 const Dashboard = () => {
   const router = useRouter()
   const theme = getTheme(useColorScheme() ?? 'light')
+  const { matches } = useMatches()
   const {
-    matches,
     subscribedMatchIds,
-    commentaryByMatchId,
     connectionStatus,
     toggleMatchSubscription,
-  } = useMatches()
+  } = useScore()
+  const { getLatestCommentary } = useCommentary()
 
   const subscribedMatches = useMemo(
     () => matches.filter((match) => subscribedMatchIds.includes(match.id)),
@@ -44,11 +46,6 @@ const Dashboard = () => {
     if (status === 'live') return 'Live'
     if (status === 'finished') return 'Finished'
     return 'Scheduled'
-  }
-
-  const getLatestCommentary = (matchId: number) => {
-    const comments = commentaryByMatchId[matchId] ?? []
-    return comments[0]?.message ?? 'No commentary yet for this match.'
   }
 
   return (
