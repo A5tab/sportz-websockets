@@ -1,7 +1,7 @@
-import { createContext, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getWsUrl } from '../utils/ws'
+import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
+import { useSocket } from '../hooks/useSocket'
 
 export type Match = {
     id: number
@@ -41,7 +41,7 @@ export const MatchesContext = createContext<MatchesContextType | null>(null)
 export const MatchesProvider = ({ children }: ProviderProps) => {
     const api = useApi()
     const { auth } = useAuth()
-    const wsRef = useRef<WebSocket | null>(null)
+    const { addMessageListener } = useSocket()
     const [matches, setMatches] = useState<Match[]>([])
 
     const refreshMatches = useCallback(async () => {
@@ -55,8 +55,6 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
     useEffect(() => {
         if (!auth.accessToken) {
             setMatches([])
-            wsRef.current?.close()
-            wsRef.current = null
             return
         }
 
@@ -64,29 +62,23 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
             console.error('Failed to fetch matches', error)
         })
 
-        const ws = new WebSocket(getWsUrl())
-        wsRef.current = ws
-
-        ws.onmessage = (event) => {
-            try {
-                const message: WsIncoming = JSON.parse(event.data as string)
-                if (message.type === 'match.created' && message.data) {
-                    const created = message.data as Match
-                    setMatches((prev) => {
-                        if (prev.some((item) => item.id === created.id)) return prev
-                        return [created, ...prev]
-                    })
-                }
-            } catch (error) {
-                console.error('Failed to parse websocket message', error)
-            }
-        }
-
-        return () => {
-            ws.close()
-            wsRef.current = null
-        }
     }, [auth.accessToken, refreshMatches])
+
+    useEffect(() => {
+        if (!auth.accessToken) return
+
+        const unsubscribe = addMessageListener((message: WsIncoming) => {
+            if (message.type !== 'match.created' || !message.data) return
+
+            const created = message.data as Match
+            setMatches((prev) => {
+                if (prev.some((item) => item.id === created.id)) return prev
+                return [created, ...prev]
+            })
+        })
+
+        return unsubscribe
+    }, [addMessageListener, auth.accessToken])
 
     const value = useMemo(
         () => ({

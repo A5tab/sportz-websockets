@@ -1,8 +1,8 @@
 import { AxiosInstance } from 'axios'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getWsUrl } from '../utils/ws'
 import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
+import { useSocket } from '../hooks/useSocket'
 import { ScoreContext } from './ScoreContext'
 
 export type CommentaryItem = {
@@ -54,6 +54,7 @@ const fetchCommentaryForMatch = async (api: AxiosInstance, matchId: number) => {
 export const CommentaryProvider = ({ children }: ProviderProps) => {
     const api = useApi()
     const { auth } = useAuth()
+    const { addMessageListener } = useSocket()
     const scoreContext = useContext(ScoreContext)
 
     if (!scoreContext) {
@@ -62,7 +63,6 @@ export const CommentaryProvider = ({ children }: ProviderProps) => {
 
     const { subscribedMatchIds } = scoreContext
 
-    const wsRef = useRef<WebSocket | null>(null)
     const prevSubscribedRef = useRef<number[]>([])
     const [commentaryByMatchId, setCommentaryByMatchId] = useState<Record<number, CommentaryItem[]>>({})
 
@@ -93,67 +93,40 @@ export const CommentaryProvider = ({ children }: ProviderProps) => {
 
     useEffect(() => {
         if (!auth.accessToken) {
-            wsRef.current?.close()
-            wsRef.current = null
             prevSubscribedRef.current = []
             setCommentaryByMatchId({})
-            return
         }
-
-        const ws = new WebSocket(getWsUrl())
-        wsRef.current = ws
-
-        ws.onopen = () => {
-            subscribedMatchIds.forEach((matchId) => {
-                ws.send(JSON.stringify({ type: 'subscribe', matchId }))
-            })
-        }
-
-        ws.onmessage = (event) => {
-            try {
-                const message: WsIncoming = JSON.parse(event.data as string)
-                if (message.type === 'match.commentary' && message.data) {
-                    const item = message.data as CommentaryItem
-                    setCommentaryByMatchId((prev) => {
-                        const current = prev[item.matchId] ?? []
-                        if (current.some((existing) => existing.id === item.id)) return prev
-
-                        return {
-                            ...prev,
-                            [item.matchId]: [item, ...current],
-                        }
-                    })
-                }
-            } catch (error) {
-                console.error('Failed to parse websocket message', error)
-            }
-        }
-
-        return () => {
-            ws.close()
-            wsRef.current = null
-        }
-    }, [auth.accessToken, subscribedMatchIds])
+    }, [auth.accessToken])
 
     useEffect(() => {
         if (!auth.accessToken) return
 
-        const ws = wsRef.current
-        const previous = prevSubscribedRef.current
-        const added = subscribedMatchIds.filter((id) => !previous.includes(id))
-        const removed = previous.filter((id) => !subscribedMatchIds.includes(id))
+        const unsubscribe = addMessageListener((message: WsIncoming) => {
+            if (message.type !== 'match.commentary' || !message.data) return
 
-        added.forEach((matchId) => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'subscribe', matchId }))
-            }
-            void refreshCommentaryForMatch(matchId)
+            const item = message.data as CommentaryItem
+            setCommentaryByMatchId((prev) => {
+                const current = prev[item.matchId] ?? []
+                if (current.some((existing) => existing.id === item.id)) return prev
+
+                return {
+                    ...prev,
+                    [item.matchId]: [item, ...current],
+                }
+            })
         })
 
-        removed.forEach((matchId) => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'unsubscribe', matchId }))
-            }
+        return unsubscribe
+    }, [addMessageListener, auth.accessToken])
+
+    useEffect(() => {
+        if (!auth.accessToken) return
+
+        const previous = prevSubscribedRef.current
+        const added = subscribedMatchIds.filter((id) => !previous.includes(id))
+
+        added.forEach((matchId) => {
+            void refreshCommentaryForMatch(matchId)
         })
 
         prevSubscribedRef.current = subscribedMatchIds
