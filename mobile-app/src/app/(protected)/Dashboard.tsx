@@ -3,44 +3,33 @@ import { Pressable, ScrollView, StyleSheet, useColorScheme, View } from 'react-n
 import { useRouter } from 'expo-router'
 import { ThemedView, ThemedText, ThemedCard, ThemedButton, Spacer } from '../../components'
 import { getTheme } from '../../constants/Colors'
-import { useScore } from '../../hooks/useScore'
-import { useCommentary } from '../../hooks/useCommentary'
 import { useMatches } from '../../hooks/useMatches'
-
-type Match = {
-  id: number
-  league: string
-  teams: string
-  score: string
-  status: string
-  commentary?: string
-}
+import { useCommentary } from '../../hooks/useCommentary'
+import { useSocket } from '../../hooks/useSocket'
 
 const Dashboard = () => {
   const router = useRouter()
   const theme = getTheme(useColorScheme() ?? 'light')
-  const { matches } = useMatches()
   const {
+    matches,
     subscribedMatchIds,
-    connectionStatus,
     toggleMatchSubscription,
-  } = useScore()
-  const { getLatestCommentary } = useCommentary()
+    isMatchSubscribed,
+  } = useMatches()
+  const { connectionStatus } = useSocket()
+  const { commentaryByMatchId } = useCommentary()
 
   const subscribedMatches = useMemo(
     () => matches.filter((match) => subscribedMatchIds.includes(match.id)),
     [matches, subscribedMatchIds]
   )
 
-  const uiMatches: Match[] = useMemo(() => {
-    return matches.map((match) => ({
-      id: match.id,
-      league: match.sport,
-      teams: `${match.homeTeam} vs ${match.awayTeam}`,
-      score: `${match.homeScore} - ${match.awayScore}`,
-      status: match.status,
-    }))
-  }, [matches])
+  const getLatestCommentary = (matchId: number) => {
+    const comments = commentaryByMatchId[matchId] ?? []
+    return comments.length > 0
+      ? `${comments[0].actor || 'Unknown'}: ${comments[0].message}`
+      : 'No commentary yet for this match.'
+  }
 
   const getStatusLabel = (status: string) => {
     if (status === 'live') return 'Live'
@@ -71,13 +60,13 @@ const Dashboard = () => {
         <ThemedText variant='heading'>Available Matches</ThemedText>
         <Spacer size={10} />
 
-        {uiMatches.map((match) => {
-          const isSubscribed = subscribedMatchIds.includes(match.id)
+        {matches.map((match) => {
+          const isSubscribed = isMatchSubscribed(match.id)
           return (
             <View key={match.id} style={styles.blockGap}>
               <ThemedCard style={[styles.matchCard, { borderColor: theme.border, borderWidth: 1 }]}>
                 <View style={styles.rowBetween}>
-                  <ThemedText variant='caption' muted={true}>{match.league}</ThemedText>
+                  <ThemedText variant='caption' muted={true}>{match.sport}</ThemedText>
                   <View
                     style={[
                       styles.statusPill,
@@ -96,8 +85,8 @@ const Dashboard = () => {
                 </View>
 
                 <Spacer size={8} />
-                <ThemedText variant='heading'>{match.teams}</ThemedText>
-                <ThemedText style={{ color: theme.primary, fontWeight: '700' }}>{match.score}</ThemedText>
+                <ThemedText variant='heading'>{match.homeTeam} vs {match.awayTeam}</ThemedText>
+                <ThemedText style={{ color: theme.primary, fontWeight: '700' }}>{match.homeScore} - {match.awayScore}</ThemedText>
 
                 <Spacer size={12} />
                 <ThemedButton
@@ -117,7 +106,7 @@ const Dashboard = () => {
           )
         })}
 
-        {uiMatches.length === 0 && (
+        {matches.length === 0 && (
           <ThemedCard style={{ borderColor: theme.border, borderWidth: 1 }}>
             <ThemedText muted={true}>No matches available yet. New matches will appear in real-time.</ThemedText>
           </ThemedCard>
@@ -135,10 +124,10 @@ const Dashboard = () => {
           subscribedMatches.map((match) => (
             <View key={`sub-${match.id}`} style={styles.blockGap}>
               <ThemedCard style={[styles.updateCard, { backgroundColor: theme.surfaceAlt }]}>
-                <ThemedText variant='heading'>{match.teams}</ThemedText>
-                <ThemedText variant='caption' muted={true}>{match.league}</ThemedText>
+                <ThemedText variant='heading'>{match.homeTeam} vs {match.awayTeam}</ThemedText>
+                <ThemedText variant='caption' muted={true}>{match.sport}</ThemedText>
                 <Spacer size={8} />
-                <ThemedText style={{ color: theme.info, fontWeight: '700' }}>{match.score}</ThemedText>
+                <ThemedText style={{ color: theme.info, fontWeight: '700' }}>{match.homeScore} - {match.awayScore}</ThemedText>
                 <Spacer size={6} />
                 <ThemedText>{getLatestCommentary(match.id)}</ThemedText>
               </ThemedCard>

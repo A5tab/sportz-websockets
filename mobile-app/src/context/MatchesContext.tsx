@@ -3,7 +3,7 @@ import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 
-export type Match = {
+type Match = {
     id: number
     sport: string
     homeTeam: string
@@ -28,6 +28,12 @@ type WsIncoming = {
 
 type MatchesContextType = {
     matches: Match[]
+    addMatch: (match: Match) => void
+    subscribedMatchIds: number[]
+    subscribeToMatch: (matchId: number) => void
+    unsubscribeFromMatch: (matchId: number) => void
+    toggleMatchSubscription: (matchId: number) => void
+    isMatchSubscribed: (matchId: number) => boolean
     refreshMatches: () => Promise<void>
 }
 
@@ -43,6 +49,11 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
     const { auth } = useAuth()
     const { addMessageListener } = useSocket()
     const [matches, setMatches] = useState<Match[]>([])
+    const [subscribedMatchIds, setSubscribedMatchIds] = useState<number[]>([])
+
+    const addMatch = (match: Match) => {
+        setMatches((prev) => [match, ...prev])
+    }
 
     const refreshMatches = useCallback(async () => {
         if (!auth.accessToken) return
@@ -55,6 +66,7 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
     useEffect(() => {
         if (!auth.accessToken) {
             setMatches([])
+            setSubscribedMatchIds([])
             return
         }
 
@@ -68,24 +80,68 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
         if (!auth.accessToken) return
 
         const unsubscribe = addMessageListener((message: WsIncoming) => {
-            if (message.type !== 'match.created' || !message.data) return
-
-            const created = message.data as Match
-            setMatches((prev) => {
-                if (prev.some((item) => item.id === created.id)) return prev
-                return [created, ...prev]
-            })
+            if (message.type === 'match.created' && message.data) {
+                const created = message.data as Match
+                setMatches((prev) => {
+                    if (prev.some((item) => item.id === created.id)) return prev
+                    return [created, ...prev]
+                })
+            }
         })
 
         return unsubscribe
     }, [addMessageListener, auth.accessToken])
 
+
+    const subscribeToMatch = useCallback((matchId: number) => {
+        setSubscribedMatchIds((prev) => {
+            if (prev.includes(matchId)) return prev
+            return [...prev, matchId]
+        })
+    }, [])
+
+    const unsubscribeFromMatch = useCallback((matchId: number) => {
+        setSubscribedMatchIds((prev) => prev.filter((id) => id !== matchId))
+    }, [])
+
+    const toggleMatchSubscription = useCallback(
+        (matchId: number) => {
+            if (subscribedMatchIds.includes(matchId)) {
+                unsubscribeFromMatch(matchId)
+                return
+            }
+
+            subscribeToMatch(matchId)
+        },
+        [subscribedMatchIds, subscribeToMatch, unsubscribeFromMatch]
+    )
+
+    const isMatchSubscribed = useCallback(
+        (matchId: number) => subscribedMatchIds.includes(matchId),
+        [subscribedMatchIds]
+    )
+
     const value = useMemo(
         () => ({
             matches,
+            subscribedMatchIds,
+            subscribeToMatch,
+            unsubscribeFromMatch,
+            toggleMatchSubscription,
+            isMatchSubscribed,
             refreshMatches,
+            addMatch
         }),
-        [matches, refreshMatches]
+        [
+            isMatchSubscribed,
+            matches,
+            addMatch,
+            refreshMatches,
+            subscribeToMatch,
+            subscribedMatchIds,
+            toggleMatchSubscription,
+            unsubscribeFromMatch,
+        ]
     )
 
     return <MatchesContext.Provider value={value}>{children}</MatchesContext.Provider>

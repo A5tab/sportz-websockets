@@ -9,3 +9,4 @@ export function getWsUrl(): string {
     const fromApi = BASE_URL.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
     return `${fromApi.replace(/\/$/, '')}/ws`
 }
+
