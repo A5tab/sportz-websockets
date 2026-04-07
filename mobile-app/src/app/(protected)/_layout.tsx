@@ -5,6 +5,7 @@ const ProtectedLayout = () => {
   return (<Protected>
     <Stack >
       <Stack.Screen name='Dashboard'/>
+      <Stack.Screen name='[matchId]' options={{ title: 'Match Detail' }} />
     </Stack>
   </Protected>
   )

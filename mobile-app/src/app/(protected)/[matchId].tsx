@@ -17,15 +17,16 @@ const MatchDetail = () => {
     const { matchId } = useLocalSearchParams<{ matchId: string }>()
     const theme = getTheme(useColorScheme() ?? 'light')
     const { matches } = useMatches()
-    const { commentaryByMatchId } = useCommentary()
+    const { commentaryByMatchId, addCommentary } = useCommentary()
     const api = useApi()
 
     const [loading, setLoading] = useState(true)
 
     const matchIdNum = matchId ? parseInt(matchId, 10) : null
     const match = matchIdNum ? matches.find((m) => m.id === matchIdNum) : null
-    const commentary = matchIdNum ? (commentaryByMatchId[matchIdNum] ?? []) : []
+    const contextCommentary = matchIdNum ? (commentaryByMatchId[matchIdNum] ?? []) : []
 
+    // Fetch initial commentary and populate context
     useEffect(() => {
         const fetchInitialCommentary = async () => {
             if (!matchIdNum) return
@@ -35,8 +36,13 @@ const MatchDetail = () => {
                     `/matches/${matchIdNum}/commentary`,
                     { params: { limit: 50 } }
                 )
-                // Commentary context will be populated by websocket listener,
-                // this fetch is for initial load only
+                
+                // Add fetched commentary to context
+                const commentaryList = Array.isArray(response.data?.data) ? response.data.data : []
+                commentaryList.forEach((item) => {
+                    addCommentary(item)
+                })
+                
                 setLoading(false)
             } catch (error) {
                 console.error('Failed to fetch commentary:', error)
@@ -45,7 +51,7 @@ const MatchDetail = () => {
         }
 
         void fetchInitialCommentary()
-    }, [matchIdNum, api])
+    }, [matchIdNum, api, addCommentary])
 
     if (!match) {
         return (
@@ -130,13 +136,13 @@ const MatchDetail = () => {
                     </View>
                 )}
 
-                {!loading && commentary.length === 0 && (
+                {!loading && contextCommentary.length === 0 && (
                     <ThemedCard style={{ borderColor: theme.border, borderWidth: 1 }}>
                         <ThemedText muted={true}>No commentary yet for this match.</ThemedText>
                     </ThemedCard>
                 )}
 
-                {commentary.map((item) => (
+                {contextCommentary.map((item) => (
                     <View key={item.id} style={styles.commentaryGap}>
                         <ThemedCard style={[styles.commentaryCard, { backgroundColor: theme.surfaceAlt }]}>
                             <View style={styles.commentaryHeader}>

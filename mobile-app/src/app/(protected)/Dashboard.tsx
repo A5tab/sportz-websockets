@@ -63,46 +63,51 @@ const Dashboard = () => {
         {matches.map((match) => {
           const isSubscribed = isMatchSubscribed(match.id)
           return (
-            <View key={match.id} style={styles.blockGap}>
-              <ThemedCard style={[styles.matchCard, { borderColor: theme.border, borderWidth: 1 }]}>
-                <View style={styles.rowBetween}>
-                  <ThemedText variant='caption' muted={true}>{match.sport}</ThemedText>
-                  <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor: match.status === 'live' ? theme.successSoft : theme.warningSoft,
-                      },
-                    ]}
-                  >
-                    <ThemedText
-                      variant='caption'
-                      style={{ color: match.status === 'live' ? theme.success : theme.warning, fontWeight: '700' }}
+            <Pressable key={match.id} onPress={() => router.push(`/(protected)/${match.id}`)}>
+              <View style={styles.blockGap}>
+                <ThemedCard style={[styles.matchCard, { borderColor: theme.border, borderWidth: 1 }]}>
+                  <View style={styles.rowBetween}>
+                    <ThemedText variant='caption' muted={true}>{match.sport}</ThemedText>
+                    <View
+                      style={[
+                        styles.statusPill,
+                        {
+                          backgroundColor: match.status === 'live' ? theme.successSoft : theme.warningSoft,
+                        },
+                      ]}
                     >
-                      {getStatusLabel(match.status)}
-                    </ThemedText>
+                      <ThemedText
+                        variant='caption'
+                        style={{ color: match.status === 'live' ? theme.success : theme.warning, fontWeight: '700' }}
+                      >
+                        {getStatusLabel(match.status)}
+                      </ThemedText>
+                    </View>
                   </View>
-                </View>
 
-                <Spacer size={8} />
-                <ThemedText variant='heading'>{match.homeTeam} vs {match.awayTeam}</ThemedText>
-                <ThemedText style={{ color: theme.primary, fontWeight: '700' }}>{match.homeScore} - {match.awayScore}</ThemedText>
+                  <Spacer size={8} />
+                  <ThemedText variant='heading'>{match.homeTeam} vs {match.awayTeam}</ThemedText>
+                  <ThemedText style={{ color: theme.primary, fontWeight: '700' }}>{match.homeScore} - {match.awayScore}</ThemedText>
 
-                <Spacer size={12} />
-                <ThemedButton
-                  variant={isSubscribed ? 'outline' : 'primary'}
-                  onPress={() => toggleMatchSubscription(match.id)}
-                  style={{
-                    borderColor: theme.primary,
-                    backgroundColor: isSubscribed ? 'transparent' : theme.primary,
-                  }}
-                >
-                  <ThemedText style={{ color: isSubscribed ? theme.primary : theme.textInverse, fontWeight: '700' }}>
-                    {isSubscribed ? 'Subscribed - Tap to Remove' : 'Subscribe'}
-                  </ThemedText>
-                </ThemedButton>
-              </ThemedCard>
-            </View>
+                  <Spacer size={12} />
+                  <ThemedButton
+                    variant={isSubscribed ? 'outline' : 'primary'}
+                    onPress={(e) => {
+                      e.stopPropagation()
+                      toggleMatchSubscription(match.id)
+                    }}
+                    style={{
+                      borderColor: theme.primary,
+                      backgroundColor: isSubscribed ? 'transparent' : theme.primary,
+                    }}
+                  >
+                    <ThemedText style={{ color: isSubscribed ? theme.primary : theme.textInverse, fontWeight: '700' }}>
+                      {isSubscribed ? 'Subscribed - Tap to Remove' : 'Subscribe'}
+                    </ThemedText>
+                  </ThemedButton>
+                </ThemedCard>
+              </View>
+            </Pressable>
           )
         })}
 
@@ -122,16 +127,18 @@ const Dashboard = () => {
           </ThemedCard>
         ) : (
           subscribedMatches.map((match) => (
-            <View key={`sub-${match.id}`} style={styles.blockGap}>
-              <ThemedCard style={[styles.updateCard, { backgroundColor: theme.surfaceAlt }]}>
-                <ThemedText variant='heading'>{match.homeTeam} vs {match.awayTeam}</ThemedText>
-                <ThemedText variant='caption' muted={true}>{match.sport}</ThemedText>
-                <Spacer size={8} />
-                <ThemedText style={{ color: theme.info, fontWeight: '700' }}>{match.homeScore} - {match.awayScore}</ThemedText>
-                <Spacer size={6} />
-                <ThemedText>{getLatestCommentary(match.id)}</ThemedText>
-              </ThemedCard>
-            </View>
+            <Pressable key={`sub-${match.id}`} onPress={() => router.push(`/(protected)/${match.id}`)}>
+              <View style={styles.blockGap}>
+                <ThemedCard style={[styles.updateCard, { backgroundColor: theme.surfaceAlt }]}>
+                  <ThemedText variant='heading'>{match.homeTeam} vs {match.awayTeam}</ThemedText>
+                  <ThemedText variant='caption' muted={true}>{match.sport}</ThemedText>
+                  <Spacer size={8} />
+                  <ThemedText style={{ color: theme.info, fontWeight: '700' }}>{match.homeScore} - {match.awayScore}</ThemedText>
+                  <Spacer size={6} />
+                  <ThemedText>{getLatestCommentary(match.id)}</ThemedText>
+                </ThemedCard>
+              </View>
+            </Pressable>
           ))
         )}
       </ScrollView>
