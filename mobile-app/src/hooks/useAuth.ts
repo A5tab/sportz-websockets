@@ -3,7 +3,7 @@ import {AuthContext, } from '../context/AuthContext'
 export const useAuth = () => {
    const authContext = useContext(AuthContext)
 
-   if (!authContext) throw new Error("Component must be wrapped inside AuthContext provider ");
+   if (!authContext) throw new Error("useAuth must be used within AuthContext provider ");
    
     return authContext;
 }

@@ -5,7 +5,7 @@ export const useMatches = () => {
     const matchesContext = useContext(MatchesContext)
 
     if (!matchesContext) {
-        throw new Error('Component must be wrapped inside MatchesContext provider')
+        throw new Error('useMatches must be used within MatchesContext provider')
     }
 
     return matchesContext

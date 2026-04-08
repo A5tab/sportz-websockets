@@ -5,7 +5,7 @@ export const useCommentary = () => {
     const commentaryContext = useContext(CommentaryContext)
 
     if (!commentaryContext) {
-        throw new Error('Component must be wrapped inside CommentaryContext provider')
+        throw new Error('useCommentary must be used within CommentaryProvider')
     }
 
     return commentaryContext

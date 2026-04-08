@@ -7,7 +7,7 @@ export const useSocket = () => {
 	const socketContext = useContext(WebSocketContext)
 
 	if (!socketContext) {
-		throw new Error("Component must be wrapped inside WebSocketContext provider")
+		throw new Error("useSocket must be used within WebSocketContext provider")
 	}
 
 	return socketContext
