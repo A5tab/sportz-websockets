@@ -1,9 +1,9 @@
 import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
-import { useSocket } from '../hooks/useSocket'
+import { useSocketEvent } from '../hooks/useSocketEvent'
 
-type Match = {
+export type Match = {
     id: number
     sport: string
     homeTeam: string
@@ -19,11 +19,6 @@ type Match = {
 
 type ApiListResponse<T> = {
     data?: T
-}
-
-type WsIncoming = {
-    type: string
-    data?: unknown
 }
 
 type MatchesContextType = {
@@ -47,7 +42,6 @@ export const MatchesContext = createContext<MatchesContextType | null>(null)
 export const MatchesProvider = ({ children }: ProviderProps) => {
     const api = useApi()
     const { auth } = useAuth()
-    const { addMessageListener } = useSocket()
     const [matches, setMatches] = useState<Match[]>([])
     const [subscribedMatchIds, setSubscribedMatchIds] = useState<number[]>([])
 
@@ -76,21 +70,22 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
 
     }, [auth.accessToken, refreshMatches])
 
-    useEffect(() => {
-        if (!auth.accessToken) return
+    useSocketEvent(
+        useMemo(
+            () => ({
+                'match.created': (message) => {
+                    if (!auth.accessToken || !message.data) return
 
-        const unsubscribe = addMessageListener((message: WsIncoming) => {
-            if (message.type === 'match.created' && message.data) {
-                const created = message.data as Match
-                setMatches((prev) => {
-                    if (prev.some((item) => item.id === created.id)) return prev
-                    return [created, ...prev]
-                })
-            }
-        })
-
-        return unsubscribe
-    }, [addMessageListener, auth.accessToken])
+                    const created = message.data as Match
+                    setMatches((prev) => {
+                        if (prev.some((item) => item.id === created.id)) return prev
+                        return [created, ...prev]
+                    })
+                },
+            }),
+            [auth.accessToken]
+        )
+    )
 
 
     const subscribeToMatch = useCallback((matchId: number) => {

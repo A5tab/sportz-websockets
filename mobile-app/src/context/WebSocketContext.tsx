@@ -27,8 +27,8 @@ export const WebSocketContext = createContext<WebContextType | null>(null)
 export const WebSocketProvider = ({ children }: ProviderProps) => {
     const { auth } = useAuth()
     const wsRef = useRef<WebSocket | null>(null)
-    const listenersRef = useRef<Set<WsMessageListener>>(new Set())
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
+    const listeners = useRef<((msg: WsIncoming) => void)[]>([])
 
     const sendWs = useCallback((payload: Record<string, unknown>) => {
         const ws = wsRef.current
@@ -36,11 +36,11 @@ export const WebSocketProvider = ({ children }: ProviderProps) => {
         ws.send(JSON.stringify(payload))
     }, [])
 
-    const addMessageListener = useCallback((listener: WsMessageListener) => {
-        listenersRef.current.add(listener)
+    const addMessageListener = useCallback((cb: WsMessageListener) => {
+        listeners.current.push(cb)
 
         return () => {
-            listenersRef.current.delete(listener)
+            listeners.current = listeners.current.filter(l => l !== cb)
         }
     }, [])
 
@@ -61,16 +61,9 @@ export const WebSocketProvider = ({ children }: ProviderProps) => {
         }
 
         ws.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data as string) as WsIncoming
-                listenersRef.current.forEach((listener) => {
-                    listener(message)
-                })
-            } catch (error) {
-                console.error('Failed to parse websocket message', error)
-            }
+            const parsed = JSON.parse(event.data)
+            listeners.current.forEach((cb) => cb(parsed))
         }
-
         ws.onclose = () => {
             setConnectionStatus('disconnected')
         }

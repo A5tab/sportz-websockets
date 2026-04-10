@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { useSocket } from '../hooks/useSocket'
+import { useSocketEvent } from '../hooks/useSocketEvent'
 
 export type CommentaryItem = {
     id: number
@@ -31,7 +31,6 @@ export const CommentaryContext = createContext<CommentaryContextType | null>(nul
 
 export const CommentaryProvider = ({ children }: ProviderProps) => {
     const { auth } = useAuth()
-    const { addMessageListener } = useSocket()
     const [commentaryByMatchId, setCommentaryByMatchId] = useState<Record<number, CommentaryItem[]>>({})
 
     const addCommentary = useCallback((commentary: CommentaryItem) => {
@@ -45,29 +44,33 @@ export const CommentaryProvider = ({ children }: ProviderProps) => {
         })
     }, [])
 
+    useSocketEvent(
+        useMemo(
+            () => ({
+                'match.commentary': (message) => {
+                    if (!auth.accessToken || !message.data) return
+
+                    const item = message.data as CommentaryItem
+                    setCommentaryByMatchId((prev) => {
+                        const current = prev[item.matchId] ?? []
+                        if (current.some((existing) => existing.id === item.id)) return prev
+
+                        return {
+                            ...prev,
+                            [item.matchId]: [item, ...current],
+                        }
+                    })
+                },
+            }),
+            [auth.accessToken]
+        )
+    )
+
     useEffect(() => {
         if (!auth.accessToken) {
             setCommentaryByMatchId({})
-            return
         }
-
-        const unsubscribe = addMessageListener((message) => {
-            if (message.type === 'match.commentary' && message.data) {
-                const item = message.data as CommentaryItem
-                setCommentaryByMatchId((prev) => {
-                    const current = prev[item.matchId] ?? []
-                    if (current.some((existing) => existing.id === item.id)) return prev
-
-                    return {
-                        ...prev,
-                        [item.matchId]: [item, ...current],
-                    }
-                })
-            }
-        })
-
-        return unsubscribe
-    }, [addMessageListener, auth.accessToken])
+    }, [auth.accessToken])
 
     const value = useMemo(
         () => ({

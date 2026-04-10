@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { ThemedView, ThemedText, ThemedTextInput, ThemedButton, Spacer, ThemedCard } from '../../components'
 import { getTheme } from '../../constants/Colors'
+import api from '../../api/axios'
 
 const Login = () => {
     const router = useRouter()
@@ -10,6 +11,12 @@ const Login = () => {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
 
+    const login = () => {
+        console.log({ email, password })
+        api.post('/login', () => {
+            
+        })
+    }
     return (
         <ThemedView safe={true} style={styles.container}>
             <View style={[styles.headerBand, { backgroundColor: theme.primarySoft }]} />
@@ -51,7 +58,7 @@ const Login = () => {
 
                 <Spacer size={16} />
 
-                <ThemedButton onPress={() => router.push('/(protected)/Dashboard')} style={{ backgroundColor: theme.primary }}>
+                <ThemedButton onPress={login} style={{ backgroundColor: theme.primary }}>
                     <ThemedText style={{ color: theme.textInverse, fontWeight: '700' }}>Login</ThemedText>
                 </ThemedButton>
 
