@@ -1,7 +1,10 @@
 import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
+import { useSocket } from '../hooks/useSocket'
 import { useSocketEvent } from '../hooks/useSocketEvent'
+import { useCommentary } from '../hooks/useCommentary'
+import { CommentaryItem } from './CommentaryContext'
 
 export type Match = {
     id: number
@@ -42,12 +45,17 @@ export const MatchesContext = createContext<MatchesContextType | null>(null)
 export const MatchesProvider = ({ children }: ProviderProps) => {
     const api = useApi()
     const { auth } = useAuth()
+    const { sendWs } = useSocket()
     const [matches, setMatches] = useState<Match[]>([])
     const [subscribedMatchIds, setSubscribedMatchIds] = useState<number[]>([])
+    const { addCommentary } = useCommentary()
 
-    const addMatch = (match: Match) => {
-        setMatches((prev) => [match, ...prev])
-    }
+    const addMatch = useCallback((match: Match) => {
+        setMatches((prev) => {
+            if (prev.some((item) => item.id === match.id)) return prev
+            return [match, ...prev]
+        })
+    }, [])
 
     const refreshMatches = useCallback(async () => {
         if (!auth.accessToken) return
@@ -56,6 +64,18 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
         const newMatches = Array.isArray(response.data?.data) ? response.data.data : []
         setMatches(newMatches)
     }, [api, auth.accessToken])
+
+    const handleCommentaryCreated = useCallback(
+        (message: { type: 'match.commentary'; data: CommentaryItem }) => {
+            if (!auth.accessToken || !message.data) return
+            addCommentary(message.data)
+        },
+        [addCommentary, auth.accessToken]
+    )
+
+    useSocketEvent({
+        'match.commentary': handleCommentaryCreated,
+    })
 
     useEffect(() => {
         if (!auth.accessToken) {
@@ -67,37 +87,21 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
         void refreshMatches().catch((error) => {
             console.error('Failed to fetch matches', error)
         })
-
     }, [auth.accessToken, refreshMatches])
-
-    useSocketEvent(
-        useMemo(
-            () => ({
-                'match.created': (message) => {
-                    if (!auth.accessToken || !message.data) return
-
-                    const created = message.data as Match
-                    setMatches((prev) => {
-                        if (prev.some((item) => item.id === created.id)) return prev
-                        return [created, ...prev]
-                    })
-                },
-            }),
-            [auth.accessToken]
-        )
-    )
-
 
     const subscribeToMatch = useCallback((matchId: number) => {
         setSubscribedMatchIds((prev) => {
             if (prev.includes(matchId)) return prev
             return [...prev, matchId]
         })
-    }, [])
+
+        sendWs({ type: 'subscribe', matchId })
+    }, [sendWs])
 
     const unsubscribeFromMatch = useCallback((matchId: number) => {
         setSubscribedMatchIds((prev) => prev.filter((id) => id !== matchId))
-    }, [])
+        sendWs({ type: 'unsubscribe', matchId })
+    }, [sendWs])
 
     const toggleMatchSubscription = useCallback(
         (matchId: number) => {
@@ -125,7 +129,7 @@ export const MatchesProvider = ({ children }: ProviderProps) => {
             toggleMatchSubscription,
             isMatchSubscribed,
             refreshMatches,
-            addMatch
+            addMatch,
         }),
         [
             isMatchSubscribed,

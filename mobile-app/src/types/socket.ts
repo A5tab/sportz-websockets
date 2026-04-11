@@ -1,14 +1,14 @@
-import {Match} from "../context/MatchesContext"
-import {CommentaryItem} from "../context/CommentaryContext"
-
-export type SocketEventType = 'match.created' | "commentary.created"
+import type { Match } from '../context/MatchesContext'
+import type { CommentaryItem } from '../context/CommentaryContext'
 
 export type SocketEventMap = {
     'match.created': Match
     'match.commentary': CommentaryItem
 }
 
-export type SocketMessage<K extends keyof SocketEventMap> = {
-  type: K
-  data: SocketEventMap[K]
-}
+export type WsIncoming = {
+    [K in keyof SocketEventMap]: {
+        type: K
+        data: SocketEventMap[K]
+    }
+}[keyof SocketEventMap]

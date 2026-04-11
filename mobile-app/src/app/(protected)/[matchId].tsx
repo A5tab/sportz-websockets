@@ -5,20 +5,13 @@ import { ThemedView, ThemedText, ThemedCard, ThemedButton, Spacer } from '../../
 import { getTheme } from '../../constants/Colors'
 import { useMatches } from '../../hooks/useMatches'
 import { useCommentary } from '../../hooks/useCommentary'
-import { useApi } from '../../hooks/useApi'
-import type { CommentaryItem } from '../../context/CommentaryContext'
-
-type CommentaryApiResponse = {
-    data?: CommentaryItem[]
-}
 
 const MatchDetail = () => {
     const router = useRouter()
     const { matchId } = useLocalSearchParams<{ matchId: string }>()
     const theme = getTheme(useColorScheme() ?? 'light')
     const { matches } = useMatches()
-    const { commentaryByMatchId, addCommentary } = useCommentary()
-    const api = useApi()
+    const { commentaryByMatchId, fetchCommentaryForMatch } = useCommentary()
 
     const [loading, setLoading] = useState(true)
 
@@ -26,32 +19,20 @@ const MatchDetail = () => {
     const match = matchIdNum ? matches.find((m) => m.id === matchIdNum) : null
     const contextCommentary = matchIdNum ? (commentaryByMatchId[matchIdNum] ?? []) : []
 
-    // Fetch initial commentary and populate context
+    // Fetch initial commentary once so detail screen has history.
     useEffect(() => {
         const fetchInitialCommentary = async () => {
             if (!matchIdNum) return
 
-            try {
-                const response = await api.get<CommentaryApiResponse>(
-                    `/matches/${matchIdNum}/commentary`,
-                    { params: { limit: 50 } }
-                )
-                
-                // Add fetched commentary to context
-                const commentaryList = Array.isArray(response.data?.data) ? response.data.data : []
-                commentaryList.forEach((item) => {
-                    addCommentary(item)
-                })
-                
-                setLoading(false)
-            } catch (error) {
-                console.error('Failed to fetch commentary:', error)
-                setLoading(false)
-            }
+            await fetchCommentaryForMatch(matchIdNum, 50)
+            setLoading(false)
         }
 
-        void fetchInitialCommentary()
-    }, [matchIdNum, api, addCommentary])
+        void fetchInitialCommentary().catch((error) => {
+            console.error('Failed to fetch initial commentary', error)
+            setLoading(false)
+        })
+    }, [fetchCommentaryForMatch, matchIdNum])
 
     if (!match) {
         return (

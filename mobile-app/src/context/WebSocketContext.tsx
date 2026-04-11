@@ -1,50 +1,46 @@
-import { createContext, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { getWsUrl } from '../utils/ws'
+import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getWsUrl } from "../utils/ws";
+import { useAuth } from "../hooks/useAuth";
+import { WsIncoming } from "../types/socket";
 
-type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
+type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
-type WsIncoming = {
-    type: string
-    data?: unknown
-}
-
-type WsMessageListener = (message: WsIncoming) => void
-
-type WebContextType = {
+type WebSocketContextType = {
     wsRef: React.RefObject<WebSocket | null>
     connectionStatus: ConnectionStatus
-    sendWs: (payload: Record<string, unknown>) => void
-    addMessageListener: (listener: WsMessageListener) => () => void
+    addMessageListener: (listener: WebSocketListener) => () => void
+    sendWs: (message: WsIncoming) => void
 }
-
 type ProviderProps = {
-    children: ReactNode
+    children: React.ReactNode
 }
 
-export const WebSocketContext = createContext<WebContextType | null>(null)
+type WebSocketListener = (message: WsIncoming) => void
 
-export const WebSocketProvider = ({ children }: ProviderProps) => {
-    const { auth } = useAuth()
+export const WebSocketContext = createContext<WebSocketContextType | null>(null);
+
+export const WebSocketContextProvider = ({ children }: ProviderProps) => {
     const wsRef = useRef<WebSocket | null>(null)
-    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
-    const listeners = useRef<((msg: WsIncoming) => void)[]>([])
+    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
+    const listenersRef = useRef<WebSocketListener[]>([])
+    const { auth } = useAuth()
 
-    const sendWs = useCallback((payload: Record<string, unknown>) => {
-        const ws = wsRef.current
-        if (!ws || ws.readyState !== WebSocket.OPEN) return
-        ws.send(JSON.stringify(payload))
-    }, [])
-
-    const addMessageListener = useCallback((cb: WsMessageListener) => {
-        listeners.current.push(cb)
+    const addMessageListener = useCallback((cb: WebSocketListener) => {
+        if (listenersRef.current.includes(cb)) return () => {}
+        listenersRef.current.push(cb)
 
         return () => {
-            listeners.current = listeners.current.filter(l => l !== cb)
+            listenersRef.current = listenersRef.current.filter(l => l !== cb)
         }
     }, [])
 
+    const sendWs = useCallback((payload: WsIncoming) => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState != WebSocket.OPEN) return;
+        ws.send(JSON.stringify(payload))
+    }, [])
     useEffect(() => {
+
         if (!auth.accessToken) {
             wsRef.current?.close()
             wsRef.current = null
@@ -55,39 +51,49 @@ export const WebSocketProvider = ({ children }: ProviderProps) => {
         setConnectionStatus('connecting')
         const ws = new WebSocket(getWsUrl())
         wsRef.current = ws
-
         ws.onopen = () => {
             setConnectionStatus('connected')
         }
 
         ws.onmessage = (event) => {
-            const parsed = JSON.parse(event.data)
-            listeners.current.forEach((cb) => cb(parsed))
+            try {
+                const parsed: WsIncoming = JSON.parse(event.data);
+                listenersRef.current.forEach((listener) => listener(parsed))
+            } catch (error) {
+                console.error('Failed to parse websocket message', error)
+            }
+
         }
+
         ws.onclose = () => {
             setConnectionStatus('disconnected')
         }
-
-        ws.onerror = () => {
+        ws.onerror = (error) => {
             setConnectionStatus('disconnected')
         }
 
         return () => {
-            ws.close()
-            wsRef.current = null
+            ws.close();
+            wsRef.current = null;
             setConnectionStatus('disconnected')
         }
     }, [auth.accessToken])
 
-    const value = useMemo(
-        () => ({
+    const value = useMemo(() =>
+    (
+        {
             wsRef,
             connectionStatus,
             sendWs,
-            addMessageListener,
-        }),
-        [connectionStatus, sendWs, addMessageListener]
+            addMessageListener
+        }
     )
-
-    return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>
+        , [
+            connectionStatus,
+            sendWs,
+            addMessageListener
+        ])
+    return <WebSocketContext.Provider value={value}>
+        {children}
+    </WebSocketContext.Provider>
 }

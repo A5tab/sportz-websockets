@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
 import { useSocketEvent } from '../hooks/useSocketEvent'
 
@@ -21,6 +22,7 @@ export type CommentaryItem = {
 type CommentaryContextType = {
     commentaryByMatchId: Record<number, CommentaryItem[]>
     addCommentary: (commentary: CommentaryItem) => void
+    fetchCommentaryForMatch: (matchId: number, limit?: number) => Promise<void>
 }
 
 type ProviderProps = {
@@ -30,12 +32,14 @@ type ProviderProps = {
 export const CommentaryContext = createContext<CommentaryContextType | null>(null)
 
 export const CommentaryProvider = ({ children }: ProviderProps) => {
+    const api = useApi()
     const { auth } = useAuth()
     const [commentaryByMatchId, setCommentaryByMatchId] = useState<Record<number, CommentaryItem[]>>({})
 
     const addCommentary = useCallback((commentary: CommentaryItem) => {
         setCommentaryByMatchId((prev) => {
             const current = prev[commentary.matchId] ?? []
+            if (current.some((item) => item.id === commentary.id)) return prev
 
             return {
                 ...prev,
@@ -44,27 +48,38 @@ export const CommentaryProvider = ({ children }: ProviderProps) => {
         })
     }, [])
 
-    useSocketEvent(
-        useMemo(
-            () => ({
-                'match.commentary': (message) => {
-                    if (!auth.accessToken || !message.data) return
+    const fetchCommentaryForMatch = useCallback(
+        async (matchId: number, limit = 50) => {
+            if (!auth.accessToken) return
 
-                    const item = message.data as CommentaryItem
-                    setCommentaryByMatchId((prev) => {
-                        const current = prev[item.matchId] ?? []
-                        if (current.some((existing) => existing.id === item.id)) return prev
+            try {
+                const response = await api.get<{ data?: CommentaryItem[] }>(`/matches/${matchId}/commentary`, {
+                    params: { limit },
+                })
 
-                        return {
-                            ...prev,
-                            [item.matchId]: [item, ...current],
-                        }
-                    })
-                },
-            }),
-            [auth.accessToken]
-        )
+                const list = Array.isArray(response.data?.data) ? response.data.data : []
+                setCommentaryByMatchId((prev) => ({
+                    ...prev,
+                    [matchId]: list,
+                }))
+            } catch (error) {
+                console.error('Failed to fetch commentary for match', matchId, error)
+            }
+        },
+        [api, auth.accessToken]
     )
+
+    const handleCommentaryCreated = useCallback(
+        (message: { type: 'match.commentary'; data: CommentaryItem }) => {
+            if (!auth.accessToken || !message.data) return
+            addCommentary(message.data)
+        },
+        [addCommentary, auth.accessToken]
+    )
+
+    useSocketEvent({
+        'match.commentary': handleCommentaryCreated,
+    })
 
     useEffect(() => {
         if (!auth.accessToken) {
@@ -76,8 +91,9 @@ export const CommentaryProvider = ({ children }: ProviderProps) => {
         () => ({
             commentaryByMatchId,
             addCommentary,
+            fetchCommentaryForMatch,
         }),
-        [commentaryByMatchId, addCommentary]
+        [commentaryByMatchId, addCommentary, fetchCommentaryForMatch]
     )
 
     return <CommentaryContext.Provider value={value}>{children}</CommentaryContext.Provider>
