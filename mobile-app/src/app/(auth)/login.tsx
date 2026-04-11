@@ -3,19 +3,46 @@ import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { ThemedView, ThemedText, ThemedTextInput, ThemedButton, Spacer, ThemedCard } from '../../components'
 import { getTheme } from '../../constants/Colors'
-import api from '../../api/axios'
+import { loginRequest } from '../../services/auth.service'
+import { saveRefreshToken } from '../../utils/token-storage'
+import { useAuth } from '../../hooks/useAuth'
 
 const Login = () => {
     const router = useRouter()
+    const { setAuth } = useAuth()
     const theme = getTheme(useColorScheme() ?? 'light')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [submitting, setSubmitting] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
 
-    const login = () => {
-        console.log({ email, password })
-        api.post('/login', () => {
-            
-        })
+    const login = async () => {
+        try {
+            setErrorMessage('')
+
+            if (!email.trim() || !password.trim()) {
+                setErrorMessage('Email and password are required.')
+                return
+            }
+
+            setSubmitting(true)
+            const session = await loginRequest({ email, password })
+
+            await saveRefreshToken(session.refreshToken)
+
+            setAuth({
+                isLoggedIn: true,
+                data: session.user,
+                loading: false,
+                accessToken: session.accessToken,
+            })
+
+            router.replace('/(protected)/Dashboard')
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : 'Login failed. Please try again.')
+        } finally {
+            setSubmitting(false)
+        }
     }
     return (
         <ThemedView safe={true} style={styles.container}>
@@ -30,6 +57,15 @@ const Login = () => {
                 <Spacer size={10} />
                 <ThemedText variant='heading' style={styles.heading}>Welcome Back</ThemedText>
                 <ThemedText muted={true}>Login to continue with your subscribed matches.</ThemedText>
+
+                {!!errorMessage && (
+                    <>
+                        <Spacer size={10} />
+                        <ThemedCard style={{ borderColor: theme.danger, borderWidth: 1, backgroundColor: theme.dangerSoft }}>
+                            <ThemedText style={{ color: theme.danger }}>{errorMessage}</ThemedText>
+                        </ThemedCard>
+                    </>
+                )}
 
                 <Spacer size={14} />
 
@@ -58,8 +94,10 @@ const Login = () => {
 
                 <Spacer size={16} />
 
-                <ThemedButton onPress={login} style={{ backgroundColor: theme.primary }}>
-                    <ThemedText style={{ color: theme.textInverse, fontWeight: '700' }}>Login</ThemedText>
+                <ThemedButton onPress={login} disabled={submitting} style={{ backgroundColor: theme.primary }}>
+                    <ThemedText style={{ color: theme.textInverse, fontWeight: '700' }}>
+                        {submitting ? 'Logging in...' : 'Login'}
+                    </ThemedText>
                 </ThemedButton>
 
                 <Spacer size={10} />

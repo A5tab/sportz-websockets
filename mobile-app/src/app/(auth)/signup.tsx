@@ -3,13 +3,56 @@ import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { ThemedView, ThemedText, ThemedTextInput, ThemedButton, Spacer, ThemedCard } from '../../components'
 import { getTheme } from '../../constants/Colors'
+import { registerRequest } from '../../services/auth.service'
+import { saveRefreshToken } from '../../utils/token-storage'
+import { useAuth } from '../../hooks/useAuth'
 
 const Signup = () => {
   const router = useRouter()
+  const { setAuth } = useAuth()
   const theme = getTheme(useColorScheme() ?? 'light')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [bio, setBio] = useState('Hello, I am new here!')
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const signup = async () => {
+    try {
+      setErrorMessage('')
+
+      if (!name.trim() || !email.trim() || !password.trim()) {
+        setErrorMessage('Full name, email, and password are required.')
+        return
+      }
+
+      setSubmitting(true)
+
+      const formData = new FormData()
+      formData.append('username', name)
+      formData.append('email', email)
+      formData.append('password', password)
+      formData.append('bio', bio)
+
+      const session = await registerRequest(formData)
+
+      await saveRefreshToken(session.refreshToken)
+
+      setAuth({
+        isLoggedIn: true,
+        data: session.user,
+        loading: false,
+        accessToken: session.accessToken,
+      })
+
+      router.replace('/(protected)/Dashboard')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Signup failed. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <ThemedView safe={true} style={styles.container}>
@@ -24,6 +67,15 @@ const Signup = () => {
         <Spacer size={10} />
         <ThemedText variant='heading' style={styles.heading}>Create Account</ThemedText>
         <ThemedText muted={true}>Sign up and subscribe to multiple matches instantly.</ThemedText>
+
+        {!!errorMessage && (
+          <>
+            <Spacer size={10} />
+            <ThemedCard style={{ borderColor: theme.danger, borderWidth: 1, backgroundColor: theme.dangerSoft }}>
+              <ThemedText style={{ color: theme.danger }}>{errorMessage}</ThemedText>
+            </ThemedCard>
+          </>
+        )}
 
         <Spacer size={14} />
 
@@ -53,6 +105,17 @@ const Signup = () => {
 
         <ThemedTextInput
           disabled={false}
+          label='Bio'
+          value={bio}
+          onChangeText={setBio}
+          placeholder='Tell people about you'
+          placeholderTextColor={theme.textSoft}
+        />
+
+        <Spacer size={8} />
+
+        <ThemedTextInput
+          disabled={false}
           label='Password'
           value={password}
           onChangeText={setPassword}
@@ -63,8 +126,10 @@ const Signup = () => {
 
         <Spacer size={16} />
 
-        <ThemedButton onPress={() => router.push('/(protected)/Dashboard')} style={{ backgroundColor: theme.success }}>
-          <ThemedText style={{ color: theme.textInverse, fontWeight: '700' }}>Continue</ThemedText>
+        <ThemedButton onPress={signup} disabled={submitting} style={{ backgroundColor: theme.success }}>
+          <ThemedText style={{ color: theme.textInverse, fontWeight: '700' }}>
+            {submitting ? 'Creating account...' : 'Continue'}
+          </ThemedText>
         </ThemedButton>
 
         <Spacer size={10} />

@@ -1,5 +1,11 @@
 import "dotenv/config";
 import fs from "fs/promises";
+import bcrypt from "bcryptjs";
+import { db } from '../db/db.js';
+import { eq } from 'drizzle-orm';
+import { users } from '../db/schema.js';
+import { createSession } from '../services/session.service.js';
+import { generateAccessToken } from '../utils/jwt.js';
 
 const DELAY_MS = Number.parseInt(process.env.DELAY_MS || "250", 10);
 const NEW_MATCH_DELAY_MIN_MS = 2000;
@@ -17,10 +23,61 @@ if (!API_URL) {
 }
 
 const DEFAULT_DATA_FILE = new URL("../data/data.json", import.meta.url);
+const DEMO_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@sportz.demo';
+const DEMO_ADMIN_USERNAME = process.env.SEED_ADMIN_USERNAME || 'sportz-admin';
+const DEMO_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'Admin@12345';
 
 async function readJsonFile(fileUrl) {
   const raw = await fs.readFile(fileUrl, "utf8");
   return JSON.parse(raw);
+}
+
+async function ensureDemoAdmin() {
+  const [existingAdmin] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, DEMO_ADMIN_EMAIL));
+
+  if (existingAdmin) {
+    return existingAdmin;
+  }
+
+  const hashedPassword = await bcrypt.hash(DEMO_ADMIN_PASSWORD, 10);
+  const [createdAdmin] = await db
+    .insert(users)
+    .values({
+      username: DEMO_ADMIN_USERNAME,
+      email: DEMO_ADMIN_EMAIL,
+      password: hashedPassword,
+      role: 'admin',
+      bio: 'Demo admin account for seeding and app recordings.',
+    })
+    .returning();
+
+  if (!createdAdmin) {
+    throw new Error('Failed to create demo admin user.');
+  }
+
+  return createdAdmin;
+}
+
+async function createDemoAdminSession(adminUser) {
+  const { rawRefreshToken, sessionId, familyId } = await createSession({
+    userId: adminUser.id,
+    userAgent: 'sportz-seed-script',
+    ipAddress: '127.0.0.1',
+  });
+
+  const accessToken = generateAccessToken({
+    id: adminUser.id,
+    username: adminUser.username,
+    email: adminUser.email,
+    role: adminUser.role,
+    sessionId,
+    familyId,
+  });
+
+  return { rawRefreshToken, accessToken };
 }
 
 async function loadSeedData() {
@@ -43,8 +100,12 @@ async function loadSeedData() {
   );
 }
 
-async function fetchMatches(limit = 100) {
-  const response = await fetch(`${API_URL}/matches?limit=${limit}`);
+async function fetchMatches(accessToken, limit = 100) {
+  const response = await fetch(`${API_URL}/matches?limit=${limit}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch matches: ${response.status}`);
   }
@@ -106,12 +167,15 @@ function buildMatchTimes(seedMatch) {
   };
 }
 
-async function createMatch(seedMatch) {
+async function createMatch(seedMatch, accessToken) {
   const { startTime, endTime } = buildMatchTimes(seedMatch);
 
   const response = await fetch(`${API_URL}/matches`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
       sport: seedMatch.sport,
       homeTeam: seedMatch.homeTeam,
@@ -129,7 +193,7 @@ async function createMatch(seedMatch) {
   return responsePayload.data;
 }
 
-async function insertCommentary(matchId, entry) {
+async function insertCommentary(matchId, entry, accessToken) {
   const payload = {
     message: entry.message ?? "Update",
   };
@@ -160,7 +224,10 @@ async function insertCommentary(matchId, entry) {
 
   const response = await fetch(`${API_URL}/matches/${matchId}/commentary`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
     // NOTE: Avoid sending nulls; the API expects missing optional fields.
     // body: JSON.stringify({
     //   minute: entry.minute ?? null,
@@ -527,8 +594,12 @@ function randomMatchDelay() {
 async function seed() {
   console.log(`📡 Seeding via API: ${API_URL}`);
 
+  const adminUser = await ensureDemoAdmin();
+  const { accessToken } = await createDemoAdminSession(adminUser);
+  console.log(`🔐 Demo admin: ${DEMO_ADMIN_EMAIL} / ${DEMO_ADMIN_PASSWORD}`);
+
   const { feed, matches: seedMatches } = await loadSeedData();
-  const matchesList = await fetchMatches();
+  const matchesList = await fetchMatches(accessToken);
 
   const matchMap = new Map();
   const matchKeyMap = new Map();
@@ -552,7 +623,7 @@ async function seed() {
       const key = `${seedMatch.sport}|${seedMatch.homeTeam}|${seedMatch.awayTeam}`;
       let match = matchKeyMap.get(key);
       if (!match || (FORCE_LIVE && !isLiveMatch(match))) {
-        match = await createMatch(seedMatch);
+        match = await createMatch(seedMatch, accessToken);
         matchKeyMap.set(key, match);
         const delayMs = randomMatchDelay();
         await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -615,7 +686,7 @@ async function seed() {
     }
     const match = target.match;
 
-    const row = await insertCommentary(match.id, entry);
+    const row = await insertCommentary(match.id, entry, accessToken);
     console.log(`📣 [Match ${match.id}] ${row.message}`);
 
     // NOTE: Score updates are intentionally disabled in this codebase.

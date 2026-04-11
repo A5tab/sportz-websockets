@@ -2,6 +2,7 @@ import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } f
 import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
 import { useSocketEvent } from '../hooks/useSocketEvent'
+import { WsIncoming } from '../types/socket'
 
 export type CommentaryItem = {
     id: number
@@ -69,13 +70,13 @@ export const CommentaryProvider = ({ children }: ProviderProps) => {
         [api, auth.accessToken]
     )
 
-    const handleCommentaryCreated = useCallback(
-        (message: { type: 'match.commentary'; data: CommentaryItem }) => {
-            if (!auth.accessToken || !message.data) return
-            addCommentary(message.data)
-        },
-        [addCommentary, auth.accessToken]
-    )
+    const handleCommentaryCreated = (message: {
+        type: 'match.commentary'
+        data: CommentaryItem
+    }) => {
+        if (!auth.accessToken) return
+        addCommentary(message.data)
+    }
 
     useSocketEvent({
         'match.commentary': handleCommentaryCreated,

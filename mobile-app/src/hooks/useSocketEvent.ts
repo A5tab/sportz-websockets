@@ -1,6 +1,6 @@
-import type { SocketEventMap, WsIncoming } from '../types/socket'
-import { useSocket } from './useSocket'
 import { useEffect } from 'react'
+import { useSocket } from './useSocket'
+import type { SocketEventMap, WsIncoming } from '../types/socket'
 
 type Handlers = {
     [K in keyof SocketEventMap]?: (message: {
@@ -14,7 +14,14 @@ export const useSocketEvent = (handlers: Handlers) => {
 
     useEffect(() => {
         const unsubscribe = addMessageListener((message: WsIncoming) => {
-            handlers[message.type]?.(message as any)
+            switch (message.type) {
+                case 'match.created':
+                    handlers['match.created']?.(message)
+                    break
+                case 'match.commentary':
+                    handlers['match.commentary']?.(message)
+                    break
+            }
         })
 
         return unsubscribe

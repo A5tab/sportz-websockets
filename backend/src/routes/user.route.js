@@ -14,17 +14,26 @@ import {
     COOKIE_NAMES,
     getRefreshTokenCookieOptions,
 } from '../config/cookie.config.js';
-import { createSession, revokeCurrentSession } from '../services/session.service.js';
+import {
+    createSession,
+    revokeAllUserSessions,
+    revokeCurrentSession,
+    revokeDeviceFamily,
+} from '../services/session.service.js';
 import { authenticate } from '../middleware/auth.js'
 import { upload } from "../middleware/multer.js"
 import { cleanupTempFile } from '../utils/cleanupTempFile.js';
 export const userRouter = Router();
 
+const getIncomingRefreshToken = (req) => {
+    return req.cookies?.[COOKIE_NAMES.REFRESH_TOKEN] || req.body?.refreshToken || req.headers['x-refresh-token'];
+};
+
 userRouter.post('/register', upload.single("avatar"), asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path;
     try {
         const { username, email, password, bio } = req.body
-        if ([username, email, password, bio].some((val) => val.trim() === "" || val.length === 0)) {
+        if ([username, email, password].some((val) => !val || String(val).trim().length === 0)) {
             throw new BadRequestError('All fields are required')
         }
 
@@ -36,7 +45,7 @@ userRouter.post('/register', upload.single("avatar"), asyncHandler(async (req, r
 
         let avatarUrl = null;
         if (avatarLocalPath) {
-            uploadedAvatar = await uploadOnCloudinary(avatarLocalPath);
+            const uploadedAvatar = await uploadOnCloudinary(avatarLocalPath);
 
             if (!uploadedAvatar?.secure_url) {
                 throw new ApiError("Avatar upload failed", { statusCode: 500 });
@@ -44,6 +53,7 @@ userRouter.post('/register', upload.single("avatar"), asyncHandler(async (req, r
             avatarUrl = uploadedAvatar?.secure_url;
         }
         const hashedPassword = await bcrypt.hash(password, 10)
+        const profileBio = typeof bio === 'string' && bio.trim() ? bio.trim() : 'Hello, I am new here!'
 
         const [user] = await db
             .insert(users)
@@ -52,7 +62,7 @@ userRouter.post('/register', upload.single("avatar"), asyncHandler(async (req, r
                 email,
                 password: hashedPassword,
                 avatar: avatarUrl,
-                bio,
+                bio: profileBio,
             })
             .returning()
 
@@ -73,7 +83,7 @@ userRouter.post('/register', upload.single("avatar"), asyncHandler(async (req, r
         return res
             .status(201)
             .cookie(COOKIE_NAMES.REFRESH_TOKEN, rawRefreshToken, getRefreshTokenCookieOptions())
-            .json(new ApiResponse(201, { user: safeUser, accessToken }, "User created successfully."))
+            .json(new ApiResponse(201, { user: safeUser, accessToken, refreshToken: rawRefreshToken }, "User created successfully."))
     } finally {
         cleanupTempFile(avatarLocalPath)
     }
@@ -94,7 +104,7 @@ userRouter.post('/login', asyncHandler(async (req, res) => {
     if (!user) throw new UnauthorizedError("Invalid Credentals.")
 
 
-    const { rawRefreshToken, sessionId, familyId } = await createSession({ userId: user.id, userAgent: req.headers['user_agent'], ipAddress: req.ip })
+    const { rawRefreshToken, sessionId, familyId } = await createSession({ userId: user.id, userAgent: req.headers['user-agent'], ipAddress: req.ip })
 
     const accessToken = generateAccessToken({ id: user.id, username: user.username, email: user.email, role: user.role, sessionId, familyId });
 
@@ -103,7 +113,7 @@ userRouter.post('/login', asyncHandler(async (req, res) => {
     return res
         .status(200)
         .cookie(COOKIE_NAMES.REFRESH_TOKEN, rawRefreshToken, getRefreshTokenCookieOptions())
-        .json(new ApiResponse(200, { user: safeUser, accessToken }, "User logged in successfully."))
+        .json(new ApiResponse(200, { user: safeUser, accessToken, refreshToken: rawRefreshToken }, "User logged in successfully."))
 
 }))
 
@@ -129,14 +139,14 @@ userRouter.delete('/logout/all', authenticate, asyncHandler(async (req, res) => 
 
 userRouter.post('/refresh', asyncHandler(async (req, res) => {
 
-    const rawTokenFromCookie = req.cookies?.[COOKIE_NAMES.REFRESH_TOKEN];
-    if (!rawTokenFromCookie) {
+    const rawRefreshToken = getIncomingRefreshToken(req);
+    if (!rawRefreshToken) {
         throw new UnauthorizedError("Refresh token missing");
     }
 
     let decoded;
     try {
-        decoded = verifyRefreshToken(rawTokenFromCookie);
+        decoded = verifyRefreshToken(rawRefreshToken);
         // decoded = { userId, sessionId, familyId }
     } catch {
         throw new UnauthorizedError("Invalid refresh token");
@@ -161,7 +171,7 @@ userRouter.post('/refresh', asyncHandler(async (req, res) => {
         throw new UnauthorizedError("Token reuse detected. Please login again.");
     }
 
-    const isTokenValid = await bcrypt.compare(rawTokenFromCookie, existingSession.refreshToken);
+    const isTokenValid = await bcrypt.compare(rawRefreshToken, existingSession.refreshToken);
     if (!isTokenValid) {
         throw new UnauthorizedError("Invalid refresh token");
     }
@@ -194,8 +204,10 @@ userRouter.post('/refresh', asyncHandler(async (req, res) => {
         familyId,
     });
 
+    const { password: _, ...safeUser } = user;
+
     return res
         .status(200)
         .cookie(COOKIE_NAMES.REFRESH_TOKEN, rawRefreshToken, getRefreshTokenCookieOptions())
-        .json(new ApiResponse(200, { accessToken }, "Token refreshed successfully"));
+        .json(new ApiResponse(200, { accessToken, refreshToken: rawRefreshToken, user: safeUser }, "Token refreshed successfully"));
 }));

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getWsUrl } from "../utils/ws";
 import { useAuth } from "../hooks/useAuth";
-import { WsIncoming } from "../types/socket";
+import { WsIncoming, WsOutgoing } from "../types/socket";
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
@@ -9,7 +9,7 @@ type WebSocketContextType = {
     wsRef: React.RefObject<WebSocket | null>
     connectionStatus: ConnectionStatus
     addMessageListener: (listener: WebSocketListener) => () => void
-    sendWs: (message: WsIncoming) => void
+    sendWs: (message: WsOutgoing) => void
 }
 type ProviderProps = {
     children: React.ReactNode
@@ -26,7 +26,7 @@ export const WebSocketContextProvider = ({ children }: ProviderProps) => {
     const { auth } = useAuth()
 
     const addMessageListener = useCallback((cb: WebSocketListener) => {
-        if (listenersRef.current.includes(cb)) return () => {}
+        if (listenersRef.current.includes(cb)) return () => { }
         listenersRef.current.push(cb)
 
         return () => {
@@ -34,7 +34,7 @@ export const WebSocketContextProvider = ({ children }: ProviderProps) => {
         }
     }, [])
 
-    const sendWs = useCallback((payload: WsIncoming) => {
+    const sendWs = useCallback((payload: WsOutgoing) => {
         const ws = wsRef.current;
         if (!ws || ws.readyState != WebSocket.OPEN) return;
         ws.send(JSON.stringify(payload))
