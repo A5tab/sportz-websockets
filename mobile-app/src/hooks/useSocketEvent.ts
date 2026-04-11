@@ -14,13 +14,10 @@ export const useSocketEvent = (handlers: Handlers) => {
 
     useEffect(() => {
         const unsubscribe = addMessageListener((message: WsIncoming) => {
-            switch (message.type) {
-                case 'match.created':
-                    handlers['match.created']?.(message)
-                    break
-                case 'match.commentary':
-                    handlers['match.commentary']?.(message)
-                    break
+            const handler = handlers[message.type as keyof SocketEventMap]
+
+            if (handler) {
+                handler(message as any) // safe internal bridge due to ts implementations
             }
         })
 
